@@ -156,6 +156,7 @@ $$('.mode-tab').forEach(tab => {
     hide('panelValid');
     hide('panelHashcat');
     hide('panelDecoder');
+    hide('panelMass');
     show('panel' + currentMode.charAt(0).toUpperCase() + currentMode.slice(1));
     if (currentMode === 'valid') loadValidHistory();
     if (currentMode === 'hashcat') loadHashcatHistory();
@@ -235,6 +236,162 @@ function renderResults(results, error, isError, total, dehash) {
     }
   }
   list.innerHTML = html;
+}
+
+// ===== Mass Check =====
+let massRunning = false;
+let massStop = false;
+let massHits = [];
+
+$('#massBtn').addEventListener('click', startMassCheck);
+$('#massStopBtn').addEventListener('click', () => { massStop = true; });
+$('#massCopyBtn').addEventListener('click', copyMassResults);
+$('#massInput').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.ctrlKey) startMassCheck(); });
+
+async function startMassCheck() {
+  if (massRunning) return;
+  const raw = $('#massInput').value.trim();
+  if (!raw) return;
+  const nicks = [...new Set(raw.split(/\r?\n/).map(s => s.trim()).filter(Boolean))];
+  if (!nicks.length) return;
+
+  massRunning = true;
+  massStop = false;
+  massHits = [];
+  let processed = 0;
+  let emptyCount = 0;
+  let errCount = 0;
+  let totalHits = 0;
+  let stopped = false;
+  let idx = 0;
+  const allResults = [];
+  const CONCURRENCY = 25;
+
+  $('#massBtn').classList.add('hidden');
+  $('#massStopBtn').classList.remove('hidden');
+  $('#massCopyBtn').classList.add('hidden');
+  $('#massProgress').classList.remove('hidden');
+  $('#massSummary').classList.add('hidden');
+  $('#massResults').classList.add('hidden');
+  $('#massEmptyState').classList.add('hidden');
+  updateMassProgress(0, nicks.length);
+
+  async function worker() {
+    while (massRunning && !massStop) {
+      const i = idx++;
+      if (i >= nicks.length) return;
+      const nick = nicks[i];
+      try {
+        const res = await fetch(`${API_URL}/api/check/nickname`, {
+          method: 'POST', headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ nickname: nick })
+        });
+        const data = await res.json();
+        if (res.status === 403) {
+          massStop = true;
+          stopped = true;
+          toast('DAILY LIMIT EXCEEDED', 3000);
+          return;
+        }
+        if (!res.ok) { errCount++; return; }
+        if (data.results && data.results.length) {
+          data.results.forEach((r, ridx) => {
+            const decrypted = data.dehash?.dehashResults?.[ridx]?.decryptedPassword;
+            allResults.push({ nickname: r.nickname, database: r.database, password: r.password, decrypted });
+            massHits.push({ nick: r.nickname, pass: r.password });
+          });
+          totalHits += data.results.length;
+        } else {
+          emptyCount++;
+        }
+      } catch {
+        errCount++;
+      } finally {
+        processed++;
+        updateMassProgress(processed, nicks.length);
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, nicks.length) }, () => worker()));
+
+  massRunning = false;
+  $('#massBtn').classList.remove('hidden');
+  $('#massStopBtn').classList.add('hidden');
+  if (massHits.length) $('#massCopyBtn').classList.remove('hidden');
+
+  const checked = processed + (stopped ? 0 : Math.max(0, nicks.length - processed));
+  renderMassResults(allResults, totalHits, emptyCount, errCount, nicks.length, checked, stopped);
+  refreshStats();
+}
+
+function updateMassProgress(processed, total) {
+  const pct = total ? Math.round((processed / total) * 100) : 0;
+  $('#massProgressFill').style.width = pct + '%';
+  $('#massProgressText').textContent = `${processed} / ${total}`;
+}
+
+function renderMassResults(results, totalHits, emptyCount, errCount, total, checked, stopped) {
+  const container = $('#massResults');
+  const output = $('#massOutput');
+  const empty = $('#massEmptyState');
+  const summary = $('#massSummary');
+
+  const finished = !stopped && checked >= total;
+  let s = `<span>Checked: <b>${checked}</b> / ${total}</span>`;
+  s += `<span class="ms-hit">Hits: ${totalHits}</span>`;
+  s += `<span class="ms-empty">Empty: ${emptyCount}</span>`;
+  if (errCount) s += `<span class="ms-err">Errors: ${errCount}</span>`;
+  if (stopped) s += `<span class="ms-err">Stopped — daily limit</span>`;
+  summary.innerHTML = s;
+  summary.classList.remove('hidden');
+
+  if (!results.length) {
+    container.classList.add('hidden');
+    empty.classList.remove('hidden');
+    return;
+  }
+  container.classList.remove('hidden');
+  empty.classList.add('hidden');
+  const seen = new Set();
+  const lines = [];
+  results.forEach(r => {
+    const line = `${r.nickname}:${r.password}`;
+    if (!seen.has(line)) { seen.add(line); lines.push(line); }
+  });
+  output.textContent = lines.join('\n');
+}
+
+function copyMassResults() {
+  const seen = new Set();
+  const lines = [];
+  massHits.forEach(h => {
+    const key = `${h.nick}:${h.pass}`;
+    if (!seen.has(key)) { seen.add(key); lines.push(key); }
+  });
+  if (lines.length) copyText(lines.join('\n'));
+}
+
+async function refreshStats() {
+  try {
+    const res = await fetch(`${API_URL}/api/user/me`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    $('#statTotalChecks').textContent = data.totalChecks ?? 0;
+    const dc = data.dailyChecks ?? 0;
+    const dl = data.dailyLimit ?? 500;
+    $('#statDailyChecks').textContent = `${dc} / ${dl}`;
+    const pct = Math.min((dc / dl) * 100, 100);
+    const fill = $('#progressFill');
+    fill.style.width = pct + '%';
+    if (pct > 80) fill.style.background = 'linear-gradient(90deg, #f59e0b, #ef4444)';
+    else fill.style.background = 'linear-gradient(90deg, #22c55e, #f59e0b)';
+  } catch {}
 }
 
 const validSound = new Audio('valid.m4a');
