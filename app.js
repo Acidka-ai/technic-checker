@@ -1,4 +1,4 @@
-const API_URL = window.location.origin;
+const API_URL = 'https://api.xn--n1aabj.su';
 let authToken = localStorage.getItem('token');
 let currentMode = 'checker';
 
