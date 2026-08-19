@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TechnicChecker — Security Panel</title>
+  <title>TechnicChecker — Панель безопасности</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
@@ -19,17 +19,17 @@
           <h1>Technic<span>Checker</span></h1>
           <img src="logo.jpg" class="logo-img" alt="logo">
         </div>
-        <p class="tagline">Security Monitoring Panel</p>
+        <p class="tagline">Панель безопасности</p>
       </div>
       <div class="login-form">
         <div class="input-group">
-          <label>Access Key</label>
+          <label>Ключ доступа</label>
           <input type="text" id="keyInput" placeholder="TECH-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false" maxlength="45">
           <div class="input-line"></div>
         </div>
-        <button id="loginBtn" type="submit">Authenticate</button>
+        <button id="loginBtn" type="submit">Войти</button>
         <div id="errorMessage" class="error-msg hidden"></div>
-        <p class="hint">No key? Run <span>/getkey</span> in <a href="https://t.me/technicchecker_bot" target="_blank">@technicchecker_bot</a></p>
+        <p class="hint">Нет ключа? Введи <span>/getkey</span> в боте <a href="https://t.me/technicchecker_bot" target="_blank">@technicchecker_bot</a></p>
       </div>
     </div>
   </div>
@@ -41,7 +41,10 @@
         <span>Technic<span>Checker</span></span>
         <img src="logo.jpg" class="logo-img small" alt="logo">
       </div>
-      <button id="logoutBtn" class="btn-ghost">Disconnect</button>
+      <div class="dash-header-right">
+        <a href="parser.html" class="btn-ghost btn-funtable" title="Парсер — расшифровка хешей и поиск по базе">Парсер</a>
+        <button id="logoutBtn" class="btn-ghost">Выйти</button>
+      </div>
     </div>
 
     <div class="dash-grid">
@@ -50,7 +53,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         </div>
         <div class="stat-info">
-          <div class="stat-label">User ID</div>
+          <div class="stat-label">ID пользователя</div>
           <div class="stat-value" id="statUserId">—</div>
         </div>
       </div>
@@ -59,7 +62,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
         </div>
         <div class="stat-info">
-          <div class="stat-label">Registration #</div>
+          <div class="stat-label">Регистрация №</div>
           <div class="stat-value" id="statRegNum">—</div>
         </div>
       </div>
@@ -68,7 +71,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
         </div>
         <div class="stat-info">
-          <div class="stat-label">Total Checks</div>
+          <div class="stat-label">Проверок всего</div>
           <div class="stat-value" id="statTotalChecks">—</div>
         </div>
       </div>
@@ -77,7 +80,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         </div>
         <div class="stat-info">
-          <div class="stat-label">Daily Usage</div>
+          <div class="stat-label">Использовано сегодня</div>
           <div class="stat-value" id="statDailyChecks">—</div>
           <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
         </div>
@@ -87,7 +90,11 @@
     <div class="mode-tabs">
       <button class="mode-tab active" data-mode="checker">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-        DB Checker
+        Чекер
+      </button>
+      <button class="mode-tab" data-mode="mass">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Массовая проверка
       </button>
       <button class="mode-tab" data-mode="mass">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -95,31 +102,32 @@
       </button>
       <button class="mode-tab" data-mode="valid">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        Valid Check
+        Валидка
       </button>
       <button class="mode-tab" data-mode="hashcat">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        Hashcat
+        Брутфорс
       </button>
       <button class="mode-tab" data-mode="decoder">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-        Decoder
+        Декодер
       </button>
     </div>
 
     <div class="dash-panel" id="panelChecker">
       <div class="panel-header">
-        <h2><span class="accent">//</span> DB CHECKER</h2>
+        <h2><span class="accent">//</span> ЧЕКЕР</h2>
+        <p class="panel-desc">Поиск ника по всем базам данных — возвращаются связанные логины и пароли</p>
       </div>
       <div class="checker-controls">
-        <input type="text" id="nickInput" placeholder="Enter nickname..." spellcheck="false">
+        <input type="text" id="nickInput" placeholder="Введите ник..." spellcheck="false">
         <button id="checkBtn"><img src="pashok.jpg" class="btn-photo" alt="go"></button>
       </div>
       <div id="checkResults" class="results-container hidden">
         <div class="results-header">
-          <span class="rh-nick">Nickname</span>
-          <span class="rh-db">Database</span>
-          <span class="rh-pass">Password / Hash</span>
+          <span class="rh-nick">Ник</span>
+          <span class="rh-db">База</span>
+          <span class="rh-pass">Пароль / Хеш</span>
           <span id="resultCount" class="rh-count"></span>
         </div>
         <div id="resultsList"></div>
@@ -128,7 +136,38 @@
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#1f2937" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
         </svg>
-        <p>Enter a nickname to search across databases</p>
+        <p>Введите ник для поиска по базам данных</p>
+      </div>
+    </div>
+
+    <div class="dash-panel hidden" id="panelMass">
+      <div class="panel-header">
+        <h2><span class="accent">//</span> МАССОВАЯ ПРОВЕРКА</h2>
+        <p class="panel-desc">Проверка списка ников за раз — совпадения сохраняются в текстовом виде</p>
+      </div>
+      <div class="mass-controls">
+        <textarea id="massInput" placeholder="Вставьте ники, по одному на строку&#10;Ctrl+Enter — начать..." spellcheck="false"></textarea>
+        <div class="mass-actions">
+          <button id="massBtn" title="Начать массовую проверку"><img src="pashok.jpg" class="btn-photo" alt="go"></button>
+          <button id="massStopBtn" class="btn-mass-stop hidden" title="Остановить">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+          </button>
+          <button id="massCopyBtn" class="btn-mass-copy hidden">Скопировать совпадения</button>
+        </div>
+      </div>
+      <div id="massProgress" class="mass-progress hidden">
+        <div class="mass-progress-bar"><div id="massProgressFill"></div></div>
+        <span id="massProgressText">0 / 0</span>
+      </div>
+      <div id="massSummary" class="mass-summary hidden"></div>
+      <div id="massResults" class="results-container hidden">
+        <pre id="massOutput"></pre>
+      </div>
+      <div id="massEmptyState" class="empty-state">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#1f2937" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        <p>Вставьте ники (по одному на строку) для массовой проверки</p>
       </div>
     </div>
 
@@ -164,87 +203,90 @@
 
     <div class="dash-panel hidden" id="panelValid">
       <div class="panel-header">
-        <h2><span class="accent">//</span> VALID CHECK</h2>
+        <h2><span class="accent">//</span> ВАЛИДКА</h2>
+        <p class="panel-desc">Валидка: проверка аккаунта на валидность — активен, бан, наличие 1FA/2FA</p>
       </div>
       <div class="history-collapse" onclick="toggleHistory('validHistoryBody',this)">
-        <span>History</span>
+        <span>История</span>
         <span class="collapse-arrow">&#9660;</span>
       </div>
       <div id="validHistoryBody" class="history-body">
         <div class="history-controls">
           <select id="validHistorySort" onchange="validHistorySort=this.value;loadValidHistory()">
-            <option value="newest">Newest</option>
-            <option value="oldest">Oldest</option>
+            <option value="newest">Сначала новые</option>
+            <option value="oldest">Сначала старые</option>
           </select>
         </div>
         <div id="validHistoryList"></div>
       </div>
       <div class="checker-controls">
-        <input type="text" id="validUserInput" placeholder="Username" spellcheck="false">
-        <input type="text" id="validPassInput" placeholder="Password" spellcheck="false">
+        <input type="text" id="validUserInput" placeholder="Логин" spellcheck="false">
+        <input type="text" id="validPassInput" placeholder="Пароль" spellcheck="false">
         <button id="validBtn"><img src="pashok.jpg" class="btn-photo" alt="go"></button>
       </div>
       <div id="validResults" class="results-container hidden">
         <div class="results-header">
-          <span>Result</span>
+          <span>Результат</span>
         </div>
         <div id="validResultList"></div>
       </div>
       <div id="validEmptyState" class="empty-state">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#1f2937" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg>
-        <p>Enter username and password to validate</p>
+        <p>Введите логин и пароль для проверки</p>
       </div>
     </div>
 
     <div class="dash-panel hidden" id="panelHashcat">
       <div class="panel-header">
-        <h2><span class="accent">//</span> HASHCAT BRUTEFORCE</h2>
+        <h2><span class="accent">//</span> БРУТФОРС ХЕШЕЙ</h2>
+        <p class="panel-desc">Расшифровка хешей перебором (AuthMe SHA256 / Bcrypt $2y$)</p>
       </div>
       <div class="history-collapse" onclick="toggleHistory('hashcatHistoryBody',this)">
-        <span>History (last 10)</span>
+        <span>История (последние 10)</span>
         <span class="collapse-arrow">&#9660;</span>
       </div>
       <div id="hashcatHistoryBody" class="history-body">
         <div id="hashcatHistoryList"></div>
       </div>
       <div class="checker-controls">
-        <input type="text" id="hashcatInput" placeholder="$SHA$... or $2y$10$..." spellcheck="false">
-        <button id="hashcatBtn" class="btn-hashcat">
+        <input type="text" id="hashcatInput" placeholder="$SHA$... или $2y$10$..." spellcheck="false">
+        <button id="hashcatBtn" class="btn-hashcat" title="Расшифровать хеш перебором">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="12 6 12 12 16 14"/><circle cx="12" cy="12" r="10"/></svg>
         </button>
       </div>
       <div id="hashcatResults" class="results-container hidden">
         <div class="results-header">
-          <span>Result</span>
+          <span>Результат</span>
           <span id="hashcatResultStatus"></span>
         </div>
         <div id="hashcatResultList"></div>
       </div>
       <div id="hashcatEmptyState" class="empty-state">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#1f2937" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="12 6 12 12 16 14"/></svg>
-        <p>Enter a hash to bruteforce (AuthMe or Bcrypt)</p>
+        <p>Введите хеш для перебора (AuthMe или Bcrypt)</p>
       </div>
     </div>
 
     <div class="dash-panel hidden" id="panelDecoder">
       <div class="panel-header">
-        <h2><span class="accent">//</span> HASH DECODER</h2>
+        <h2><span class="accent">//</span> ДЕКОДЕР</h2>
+        <p class="panel-desc">Расшифровка хеша в пароль или поиск пароля по базе</p>
       </div>
       <div class="checker-controls">
-        <input type="text" id="decodeInput" placeholder="Hash or password..." spellcheck="false">
-        <button id="decodeBtn" class="btn-hashcat">
+        <input type="text" id="decodeInput" placeholder="Хеш или пароль..." spellcheck="false">
+        <button id="decodeBtn" class="btn-hashcat" title="Расшифровать">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
         </button>
       </div>
       <div id="decodeResults" class="results-container hidden">
         <div class="results-header">
-          <span>Result</span>
+          <span>Результат</span>
         </div>
         <div id="decodeResultList"></div>
       </div>
       <div id="decodeEmptyState" class="empty-state">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#1f2937" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-        <p>Enter a hash to decode or password to search</p>
+        <p>Введите хеш для расшифровки или пароль для поиска</p>
       </div>
     </div>
   </div>

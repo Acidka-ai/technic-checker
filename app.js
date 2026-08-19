@@ -66,6 +66,30 @@ function loading(btn, state) {
   else { btn.classList.remove('btn-loading'); btn.disabled = false; }
 }
 
+let authKicked = false;
+let hashcatPollTimer = null;
+
+function handleUnauthorized() {
+  if (authKicked) return;
+  authKicked = true;
+  authToken = null;
+  localStorage.removeItem('token');
+  if (hashcatPollTimer) { clearInterval(hashcatPollTimer); hashcatPollTimer = null; }
+  hide('dashboardPage');
+  show('loginPage');
+  $('#keyInput').value = '';
+  toast('Сессия истекла — введите новый ключ', 2500);
+}
+
+async function apiFetch(url, options) {
+  const res = await fetch(url, options);
+  if (res.status === 401) {
+    handleUnauthorized();
+    throw new Error('Unauthorized');
+  }
+  return res;
+}
+
 function isHash(val) {
   return /^\$SHA\$/.test(val) || /^\$2[ayb]\$/.test(val) ||
          /^[a-fA-F0-9]{32}$/.test(val) || /^[a-fA-F0-9]{40}$/.test(val) ||
@@ -84,7 +108,7 @@ function toast(msg, duration) {
 async function copyText(text) {
   try {
     await navigator.clipboard.writeText(text);
-    toast('Copied');
+    toast('Скопировано ✓');
   } catch {
     const ta = document.createElement('textarea');
     ta.value = text;
@@ -93,7 +117,7 @@ async function copyText(text) {
     ta.select();
     document.execCommand('copy');
     document.body.removeChild(ta);
-    toast('Copied');
+    toast('Скопировано ✓');
   }
 }
 
@@ -126,14 +150,15 @@ async function login() {
     });
     const data = await res.json();
     if (!res.ok) {
-      showError(data.error === 'Key expired' ? 'KEY EXPIRED' : 'INVALID KEY');
+      showError(data.error === 'Key expired' ? 'КЛЮЧ ИСТЁК' : 'НЕВЕРНЫЙ КЛЮЧ');
       return;
     }
     authToken = data.token;
     localStorage.setItem('token', authToken);
+    authKicked = false;
     showDashboard(data);
   } catch {
-    showError('CONNECTION ERROR');
+    showError('ОШИБКА СОЕДИНЕНИЯ');
   } finally {
     loading($('#loginBtn'), false);
   }
@@ -141,25 +166,31 @@ async function login() {
 
 $('#logoutBtn').addEventListener('click', () => {
   authToken = null;
+  authKicked = false;
   localStorage.removeItem('token');
   hide('dashboardPage');
   show('loginPage');
   $('#keyInput').value = '';
 });
 
+function setMode(mode) {
+  $$('.mode-tab').forEach(t => t.classList.remove('active'));
+  const tab = document.querySelector(`.mode-tab[data-mode="${mode}"]`);
+  if (tab) tab.classList.add('active');
+  currentMode = mode;
+  hide('panelChecker');
+  hide('panelValid');
+  hide('panelHashcat');
+  hide('panelDecoder');
+  hide('panelMass');
+  show('panel' + mode.charAt(0).toUpperCase() + mode.slice(1));
+  if (mode === 'valid') loadValidHistory();
+  if (mode === 'hashcat') loadHashcatHistory();
+}
+
 $$('.mode-tab').forEach(tab => {
   tab.addEventListener('click', () => {
-    $$('.mode-tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    currentMode = tab.dataset.mode;
-    hide('panelChecker');
-    hide('panelValid');
-    hide('panelHashcat');
-    hide('panelDecoder');
-    hide('panelMass');
-    show('panel' + currentMode.charAt(0).toUpperCase() + currentMode.slice(1));
-    if (currentMode === 'valid') loadValidHistory();
-    if (currentMode === 'hashcat') loadHashcatHistory();
+    setMode(tab.dataset.mode);
   });
 });
 
@@ -171,7 +202,7 @@ async function checkNickname() {
   if (!nick) return;
   loading($('#checkBtn'), true);
   try {
-    const res = await fetch(`${API_URL}/api/check/nickname`, {
+    const res = await apiFetch(`${API_URL}/api/check/nickname`, {
       method: 'POST', headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${authToken}`
@@ -179,11 +210,11 @@ async function checkNickname() {
       body: JSON.stringify({ nickname: nick })
     });
     const data = await res.json();
-    if (res.status === 403) { renderResults([], 'DAILY LIMIT EXCEEDED', true, 0, null); return; }
-    if (!res.ok) { renderResults([], data.error || 'ERROR', true, 0, null); return; }
+    if (res.status === 403) { renderResults([], 'ДНЕВНОЙ ЛИМИТ ИСЧЕРПАН', true, 0, null); return; }
+    if (!res.ok) { renderResults([], data.error || 'ОШИБКА', true, 0, null); return; }
     renderResults(data.results, null, false, data.total, data.dehash);
   } catch {
-    renderResults([], 'CONNECTION ERROR', true, 0, null);
+    renderResults([], 'ОШИБКА СОЕДИНЕНИЯ', true, 0, null);
   } finally {
     loading($('#checkBtn'), false);
   }
@@ -203,35 +234,35 @@ function renderResults(results, error, isError, total, dehash) {
     container.classList.add('hidden'); empty.classList.remove('hidden'); return;
   }
   container.classList.remove('hidden'); empty.classList.add('hidden');
-  if (count) count.textContent = `${results.length} match${results.length !== 1 ? 'es' : ''}`;
+  if (count) count.textContent = `${results.length} ${results.length === 1 ? 'совпадение' : 'совпадений'}`;
   let html = '';
   results.forEach((r, idx) => {
     const isHashVal = isHash(r.password);
     const decrypted = dehash?.dehashResults?.[idx]?.decryptedPassword;
     const hashLabel = isHashVal ? 'hash' : 'pass';
     html += `<div class="result-row">
-      <span class="rr-nick" onclick="copyText('${escAttr(r.nickname)}')">${esc(r.nickname)}</span>
+      <span class="rr-nick" onclick="copyText('${escAttr(r.nickname)}')" title="Скопировать ник">${esc(r.nickname)}</span>
       <span class="rr-db">${esc(r.database)}</span>
-      <span class="rr-pass ${hashLabel}" onclick="copyText('${escAttr(r.password)}')" title="Click to copy">${esc(r.password)}</span>`;
+      <span class="rr-pass ${hashLabel}" onclick="copyText('${escAttr(r.password)}')" title="Нажмите, чтобы скопировать">${esc(r.password)}</span>`;
     if (isHashVal) {
-      html += `<button class="btn-brut" onclick="openHashcat('${escAttr(r.password)}')" title="Bruteforce this hash"></button>`;
+      html += `<button class="btn-brut" onclick="openHashcat('${escAttr(r.password)}')" title="Расшифровать хеш перебором (подбор пароля)">⚡ Брутфорс</button>`;
     }
     html += `</div>`;
     if (decrypted) {
       html += `<div class="result-row dehash-row">
-        <span class="rr-label" style="color:#a855f7">🔑 Decoded</span>
-        <span class="rr-pass" onclick="copyText('${escAttr(decrypted)}')" style="color:#a855f7">${esc(decrypted)}</span>
+        <span class="rr-label" style="color:#00ff88">🔑 Расшифровано</span>
+        <span class="rr-pass" onclick="copyText('${escAttr(decrypted)}')" style="color:#00ff88" title="Нажмите, чтобы скопировать">${esc(decrypted)}</span>
       </div>`;
     }
   });
   if (dehash) {
     if (dehash.foundHashes > 0 && dehash.decryptedHashes === 0) {
       html += `<div class="result-row" style="border-top:1px solid var(--border-glass);background:transparent">
-        <span style="font-size:11px;color:var(--text-secondary);grid-column:1/-1">❌ Hashes not decrypted — use Hashcat tab</span>
+        <span style="font-size:11px;color:var(--text-secondary);grid-column:1/-1">Хеши не расшифрованы — используйте вкладку «Брутфорс»</span>
       </div>`;
     } else if (dehash.decryptedHashes > 0) {
       html += `<div class="result-row" style="border-top:1px solid var(--border-glass);background:transparent">
-        <span style="font-size:11px;color:var(--accent);grid-column:1/-1">✅ Auto-decoded ${dehash.decryptedHashes} hash${dehash.decryptedHashes !== 1 ? 'es' : ''}</span>
+        <span style="font-size:11px;color:var(--accent);grid-column:1/-1">✅ Автоматически расшифровано хешей: ${dehash.decryptedHashes}</span>
       </div>`;
     }
   }
@@ -282,7 +313,7 @@ async function startMassCheck() {
       if (i >= nicks.length) return;
       const nick = nicks[i];
       try {
-        const res = await fetch(`${API_URL}/api/check/nickname`, {
+        const res = await apiFetch(`${API_URL}/api/check/nickname`, {
           method: 'POST', headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${authToken}`
@@ -293,7 +324,7 @@ async function startMassCheck() {
         if (res.status === 403) {
           massStop = true;
           stopped = true;
-          toast('DAILY LIMIT EXCEEDED', 3000);
+          toast('Дневной лимит исчерпан', 3000);
           return;
         }
         if (!res.ok) { errCount++; return; }
@@ -309,6 +340,7 @@ async function startMassCheck() {
         }
       } catch {
         errCount++;
+        if (authKicked) { massStop = true; stopped = true; }
       } finally {
         processed++;
         updateMassProgress(processed, nicks.length);
@@ -341,11 +373,11 @@ function renderMassResults(results, totalHits, emptyCount, errCount, total, chec
   const summary = $('#massSummary');
 
   const finished = !stopped && checked >= total;
-  let s = `<span>Checked: <b>${checked}</b> / ${total}</span>`;
-  s += `<span class="ms-hit">Hits: ${totalHits}</span>`;
-  s += `<span class="ms-empty">Empty: ${emptyCount}</span>`;
-  if (errCount) s += `<span class="ms-err">Errors: ${errCount}</span>`;
-  if (stopped) s += `<span class="ms-err">Stopped — daily limit</span>`;
+  let s = `<span>Проверено: <b>${checked}</b> / ${total}</span>`;
+  s += `<span class="ms-hit">Совпадений: ${totalHits}</span>`;
+  s += `<span class="ms-empty">Пусто: ${emptyCount}</span>`;
+  if (errCount) s += `<span class="ms-err">Ошибок: ${errCount}</span>`;
+  if (stopped) s += `<span class="ms-err">Остановлено — дневной лимит</span>`;
   summary.innerHTML = s;
   summary.classList.remove('hidden');
 
@@ -377,7 +409,7 @@ function copyMassResults() {
 
 async function refreshStats() {
   try {
-    const res = await fetch(`${API_URL}/api/user/me`, {
+    const res = await apiFetch(`${API_URL}/api/user/me`, {
       headers: { 'Authorization': `Bearer ${authToken}` }
     });
     if (!res.ok) return;
@@ -410,7 +442,7 @@ async function validCheck() {
   validSound.currentTime = 0;
   validSound.play().catch(() => {});
   try {
-    const res = await fetch(`${API_URL}/api/valid/check`, {
+    const res = await apiFetch(`${API_URL}/api/valid/check`, {
       method: 'POST', headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${authToken}`
@@ -419,23 +451,23 @@ async function validCheck() {
     });
     const data = await res.json();
     validSound.pause();
-    if (res.status === 403) { renderValidResult([{ label: 'Error', value: 'DAILY LIMIT EXCEEDED' }], true); return; }
-    if (!res.ok) { renderValidResult([{ label: 'Error', value: data.error || 'CHECK FAILED' }], true); return; }
+    if (res.status === 403) { renderValidResult([{ label: 'Ошибка', value: 'ДНЕВНОЙ ЛИМИТ ИСЧЕРПАН' }], true); return; }
+    if (!res.ok) { renderValidResult([{ label: 'Ошибка', value: data.error || 'ПРОВЕРКА НЕ УДАЛАСЬ' }], true); return; }
     const items = [
-      { label: 'Status', value: data.valid ? 'VALID' : 'INVALID' },
-      { label: '1FA', value: data.has1fa ? 'Yes' : 'No' },
-      { label: '2FA', value: data.has2fa ? 'Yes' : 'No' },
-      { label: 'Banned', value: data.banned ? 'Yes' : 'No' },
+      { label: 'Статус', value: data.valid ? 'Аккаунт действителен' : 'Аккаунт недействителен' },
+      { label: '1FA', value: data.has1fa ? 'Да' : 'Нет' },
+      { label: '2FA', value: data.has2fa ? 'Да' : 'Нет' },
+      { label: 'Забанен', value: data.banned ? 'Да' : 'Нет' },
     ];
-    if (data.banned && data.banReason) items.push({ label: 'Ban Reason', value: data.banReason });
-    if (data.banned && data.banDuration) items.push({ label: 'Ban Duration', value: data.banDuration });
+    if (data.banned && data.banReason) items.push({ label: 'Причина бана', value: data.banReason });
+    if (data.banned && data.banDuration) items.push({ label: 'Срок бана', value: data.banDuration });
     renderValidResult(items, false, data.valid);
     showValidStats(data.valid);
     if (!data.valid) nevalidSound.play().catch(() => {});
     loadValidHistory();
   } catch {
     validSound.pause();
-    renderValidResult([{ label: 'Error', value: 'CONNECTION ERROR' }], true);
+    renderValidResult([{ label: 'Ошибка', value: 'ОШИБКА СОЕДИНЕНИЯ' }], true);
   } finally {
     loading($('#validBtn'), false);
   }
@@ -481,8 +513,6 @@ function showValidStats(v) {
 $('#hashcatBtn').addEventListener('click', () => hashcatBruteforce($('#hashcatInput').value.trim()));
 $('#hashcatInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') hashcatBruteforce($('#hashcatInput').value.trim()); });
 
-let hashcatPollTimer = null;
-
 function openHashcat(hash) {
   const tab = document.querySelector('.mode-tab[data-mode="hashcat"]');
   if (tab) tab.click();
@@ -497,7 +527,7 @@ async function hashcatBruteforce(hash) {
   $('#hashcatResults').classList.add('hidden');
   $('#hashcatEmptyState').classList.add('hidden');
   try {
-    const res = await fetch(`${API_URL}/api/hashcat`, {
+    const res = await apiFetch(`${API_URL}/api/hashcat`, {
       method: 'POST', headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${authToken}`
@@ -505,16 +535,16 @@ async function hashcatBruteforce(hash) {
       body: JSON.stringify({ hash })
     });
     const data = await res.json();
-    if (!res.ok) { renderHashcatResult(null, data.error || 'ERROR', true); return; }
+    if (!res.ok) { renderHashcatResult(null, data.error || 'ОШИБКА', true); return; }
     if (data.taskId && data.position > 0) {
-      renderHashcatResult(null, `Queued — position ${data.position}`, false, 'queued');
+      renderHashcatResult(null, `В очереди — позиция ${data.position}`, false, 'queued');
       hashcatPollTimer = setInterval(() => pollHashcatResult(data.taskId), 2000);
     } else if (data.taskId) {
-      renderHashcatResult(null, 'Processing...', false, 'processing');
+      renderHashcatResult(null, 'Обработка…', false, 'processing');
       hashcatPollTimer = setInterval(() => pollHashcatResult(data.taskId), 2000);
     }
   } catch {
-    renderHashcatResult(null, 'CONNECTION ERROR', true);
+    renderHashcatResult(null, 'ОШИБКА СОЕДИНЕНИЯ', true);
   } finally {
     loading($('#hashcatBtn'), false);
   }
@@ -522,7 +552,7 @@ async function hashcatBruteforce(hash) {
 
 async function pollHashcatResult(taskId) {
   try {
-    const res = await fetch(`${API_URL}/api/hashcat/status/${taskId}`, {
+    const res = await apiFetch(`${API_URL}/api/hashcat/status/${taskId}`, {
       headers: { 'Authorization': `Bearer ${authToken}` }
     });
     if (!res.ok) { clearInterval(hashcatPollTimer); hashcatPollTimer = null; return; }
@@ -530,16 +560,16 @@ async function pollHashcatResult(taskId) {
     if (data.taskStatus === 'processing' || data.status === 'processing') return;
     clearInterval(hashcatPollTimer); hashcatPollTimer = null;
     if (data.hashcatStatus === 'Cracked' && data.password) {
-      renderHashcatResult(data.password, `Cracked in ${data.elapsed}s`, false, 'done');
-      toast('✅ Hash cracked: ' + data.password, 3000);
+      renderHashcatResult(data.password, `Расшифровано за ${data.elapsed}с`, false, 'done');
+      toast('✅ Хеш расшифрован: ' + data.password, 3000);
     } else if (data.hashcatStatus === 'Exhausted') {
-      renderHashcatResult(null, `Not found — ${data.elapsed}s`, false, 'done');
-      toast('❌ Hash not found', 2000);
+      renderHashcatResult(null, `Пароль не найден — ${data.elapsed}с`, false, 'done');
+      toast('❌ Пароль не найден', 2000);
     } else if (data.hashcatStatus === 'Timeout') {
-      renderHashcatResult(null, 'Timeout', false, 'done');
-      toast('⏱ Timeout', 2000);
+      renderHashcatResult(null, 'Время истекло', false, 'done');
+      toast('⏱ Время истекло', 2000);
     } else {
-      renderHashcatResult(null, `Status: ${data.hashcatStatus || data.status}`, false, 'done');
+      renderHashcatResult(null, `Статус: ${data.hashcatStatus || data.status}`, false, 'done');
     }
     loadHashcatHistory();
   } catch {
@@ -561,8 +591,8 @@ function renderHashcatResult(password, message, isError, stage) {
   if (password) {
     list.innerHTML = `
       <div class="result-row">
-        <span style="font-size:13px;color:var(--text-secondary)">🔑 Password</span>
-        <span style="font-size:14px;font-weight:700" onclick="copyText('${escAttr(password)}')">${esc(password)}</span>
+        <span style="font-size:13px;color:var(--text-secondary)">🔑 Пароль</span>
+        <span style="font-size:14px;font-weight:700" onclick="copyText('${escAttr(password)}')" title="Нажмите, чтобы скопировать">${esc(password)}</span>
       </div>
       <div class="result-row" style="border-top:1px solid var(--border-glass)">
         <span style="font-size:12px;color:var(--text-secondary);grid-column:1/-1">${esc(message)}</span>
@@ -581,7 +611,7 @@ async function decodeHash() {
   if (!input) return;
   loading($('#decodeBtn'), true);
   try {
-    const res = await fetch(`${API_URL}/api/decode`, {
+    const res = await apiFetch(`${API_URL}/api/decode`, {
       method: 'POST', headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${authToken}`
@@ -589,10 +619,10 @@ async function decodeHash() {
       body: JSON.stringify({ input })
     });
     const data = await res.json();
-    if (!res.ok) { renderDecodeResult(null, data.error || 'ERROR', true); return; }
+    if (!res.ok) { renderDecodeResult(null, data.error || 'ОШИБКА', true); return; }
     renderDecodeResult(data, null, false);
   } catch {
-    renderDecodeResult(null, 'CONNECTION ERROR', true);
+    renderDecodeResult(null, 'ОШИБКА СОЕДИНЕНИЯ', true);
   } finally {
     loading($('#decodeBtn'), false);
   }
@@ -610,39 +640,39 @@ function renderDecodeResult(data, error, isError) {
   let html = '';
   if (data.direction === 'hash-to-pass') {
     html += `<div class="result-row">
-      <span style="color:var(--text-secondary);font-size:12px">Hash</span>
-      <span class="rr-pass hash" onclick="copyText('${escAttr(data.hash)}')">${esc(data.hash)}</span>
+      <span style="color:var(--text-secondary);font-size:12px">Хеш</span>
+      <span class="rr-pass hash" onclick="copyText('${escAttr(data.hash)}')" title="Нажмите, чтобы скопировать">${esc(data.hash)}</span>
     </div>
     <div class="result-row" style="background:transparent">
-      <span style="color:#a855f7;font-size:12px">🔑 Decoded</span>
-      <span style="color:#a855f7;font-weight:600" onclick="copyText('${escAttr(data.password)}')">${esc(data.password)}</span>
+      <span style="color:var(--accent);font-size:12px">🔑 Расшифровано</span>
+      <span style="color:var(--accent);font-weight:600" onclick="copyText('${escAttr(data.password)}')" title="Нажмите, чтобы скопировать">${esc(data.password)}</span>
     </div>`;
   } else if (data.direction === 'pass-to-hash') {
     html += `<div class="result-row">
-      <span style="color:var(--text-secondary);font-size:12px">Password</span>
-      <span style="font-weight:600" onclick="copyText('${escAttr(data.password)}')">${esc(data.password)}</span>
+      <span style="color:var(--text-secondary);font-size:12px">Пароль</span>
+      <span style="font-weight:600" onclick="copyText('${escAttr(data.password)}')" title="Нажмите, чтобы скопировать">${esc(data.password)}</span>
     </div>`;
     if (data.hashes && data.hashes.length > 0) {
       data.hashes.forEach(h => {
         html += `<div class="result-row">
-          <span style="color:var(--text-secondary);font-size:12px">Hash</span>
-          <span class="rr-pass hash" onclick="copyText('${escAttr(h)}')">${esc(h)}</span>
+          <span style="color:var(--text-secondary);font-size:12px">Хеш</span>
+          <span class="rr-pass hash" onclick="copyText('${escAttr(h)}')" title="Нажмите, чтобы скопировать">${esc(h)}</span>
         </div>`;
       });
     } else {
-      html += `<div class="result-row"><span style="color:var(--text-secondary);grid-column:1/-1">No hashes found for this password</span></div>`;
+      html += `<div class="result-row"><span style="color:var(--text-secondary);grid-column:1/-1">Хеши для этого пароля не найдены</span></div>`;
     }
   } else if (data.direction === 'passwords-list') {
     html += `<div class="result-row">
-      <span style="color:var(--text-secondary);font-size:12px">Found passwords</span>
+      <span style="color:var(--text-secondary);font-size:12px">Найденные пароли</span>
     </div>`;
     data.passwords.forEach(pw => {
       html += `<div class="result-row">
-        <span style="grid-column:1/-1" onclick="copyText('${escAttr(pw)}')">${esc(pw)}</span>
+        <span style="grid-column:1/-1" onclick="copyText('${escAttr(pw)}')" title="Нажмите, чтобы скопировать">${esc(pw)}</span>
       </div>`;
     });
   } else {
-    html += `<div class="result-row"><span style="color:var(--text-secondary);grid-column:1/-1">${data.message || 'No result'}</span></div>`;
+    html += `<div class="result-row"><span style="color:var(--text-secondary);grid-column:1/-1">${data.message || 'Ничего не найдено'}</span></div>`;
   }
   list.innerHTML = html;
 }
@@ -653,30 +683,30 @@ let validHistorySort = 'newest';
 async function loadValidHistory() {
   const list = $('#validHistoryList');
   if (!list) return;
-  list.innerHTML = '<div style="padding:8px;color:var(--text-secondary);font-size:12px">Loading...</div>';
+  list.innerHTML = '<div style="padding:8px;color:var(--text-secondary);font-size:12px">Загрузка…</div>';
   try {
-    const res = await fetch(`${API_URL}/api/valid/history?sort=${validHistorySort}`, {
+    const res = await apiFetch(`${API_URL}/api/valid/history?sort=${validHistorySort}`, {
       headers: { 'Authorization': `Bearer ${authToken}` }
     });
-    if (!res.ok) { list.innerHTML = '<div class="result-error">Failed to load</div>'; return; }
+    if (!res.ok) { list.innerHTML = '<div class="result-error">Не удалось загрузить</div>'; return; }
     const rows = await res.json();
     if (!rows.length) {
-      list.innerHTML = '<div style="padding:8px;color:var(--text-secondary);font-size:12px">No history</div>';
+      list.innerHTML = '<div style="padding:8px;color:var(--text-secondary);font-size:12px">Истории нет</div>';
       return;
     }
     list.innerHTML = rows.map(r => {
       const badge = r.valid ? '<span style="color:var(--accent)">✅</span>' : '<span style="color:var(--danger)">❌</span>';
-      const ban = r.banned ? ' <span style="color:var(--danger);font-size:10px">BANNED</span>' : '';
+      const ban = r.banned ? ' <span style="color:var(--danger);font-size:10px">ЗАБАНЕН</span>' : '';
       return `<div class="result-row" style="gap:2px">
         <span style="min-width:24px;font-size:12px">${badge}</span>
-        <span style="font-size:12px;min-width:70px" onclick="copyText('${escAttr(r.username)}')">${esc(r.username)}</span>
-        <span style="font-size:11px;flex:1" onclick="copyText('${escAttr(r.password)}')">${esc(r.password)}</span>
+        <span style="font-size:12px;min-width:70px" onclick="copyText('${escAttr(r.username)}')" title="Скопировать">${esc(r.username)}</span>
+        <span style="font-size:11px;flex:1" onclick="copyText('${escAttr(r.password)}')" title="Скопировать">${esc(r.password)}</span>
         <span style="font-size:10px;color:var(--text-secondary)">${r.timestamp ? r.timestamp.split(' ')[0] : ''}</span>
         <span style="font-size:10px">${ban}</span>
       </div>`;
     }).join('');
   } catch {
-    list.innerHTML = '<div class="result-error">Connection error</div>';
+    list.innerHTML = '<div class="result-error">Ошибка соединения</div>';
   }
 }
 
@@ -684,15 +714,15 @@ async function loadValidHistory() {
 async function loadHashcatHistory() {
   const list = $('#hashcatHistoryList');
   if (!list) return;
-  list.innerHTML = '<div style="padding:8px;color:var(--text-secondary);font-size:12px">Loading...</div>';
+  list.innerHTML = '<div style="padding:8px;color:var(--text-secondary);font-size:12px">Загрузка…</div>';
   try {
-    const res = await fetch(`${API_URL}/api/hashcat/history`, {
+    const res = await apiFetch(`${API_URL}/api/hashcat/history`, {
       headers: { 'Authorization': `Bearer ${authToken}` }
     });
-    if (!res.ok) { list.innerHTML = '<div class="result-error">Failed to load</div>'; return; }
+    if (!res.ok) { list.innerHTML = '<div class="result-error">Не удалось загрузить</div>'; return; }
     const rows = await res.json();
     if (!rows.length) {
-      list.innerHTML = '<div style="padding:8px;color:var(--text-secondary);font-size:12px">No history</div>';
+      list.innerHTML = '<div style="padding:8px;color:var(--text-secondary);font-size:12px">Истории нет</div>';
       return;
     }
     list.innerHTML = rows.map(r => {
@@ -700,30 +730,37 @@ async function loadHashcatHistory() {
       const badge = ok ? '<span style="color:var(--accent)">✅</span>' : '<span style="color:var(--danger)">❌</span>';
       return `<div class="result-row" style="gap:2px">
         <span style="min-width:24px;font-size:12px">${badge}</span>
-        <span class="rr-pass hash" style="font-size:11px;flex:1" onclick="copyText('${escAttr(r.hash_value)}')">${esc(r.hash_value)}</span>
-        <span style="font-size:11px;color:${ok ? 'var(--accent)' : 'var(--text-secondary)'};min-width:60px" onclick="copyText('${escAttr(r.result)}')">${ok ? esc(r.result) : r.status}</span>
+        <span class="rr-pass hash" style="font-size:11px;flex:1" onclick="copyText('${escAttr(r.hash_value)}')" title="Скопировать">${esc(r.hash_value)}</span>
+        <span style="font-size:11px;color:${ok ? 'var(--accent)' : 'var(--text-secondary)'};min-width:60px" onclick="copyText('${escAttr(r.result)}')" title="Скопировать">${ok ? esc(r.result) : r.status}</span>
         <span style="font-size:10px;color:var(--text-secondary)">${r.timestamp ? r.timestamp.split(' ')[0] : ''}</span>
       </div>`;
     }).join('');
   } catch {
-    list.innerHTML = '<div class="result-error">Connection error</div>';
+    list.innerHTML = '<div class="result-error">Ошибка соединения</div>';
   }
 }
 
 // ===== Auth / Dashboard =====
 async function checkAuth() {
   try {
-    const res = await fetch(`${API_URL}/api/user/me`, {
+    const res = await apiFetch(`${API_URL}/api/user/me`, {
       headers: { 'Authorization': `Bearer ${authToken}` }
     });
     if (!res.ok) throw new Error();
     const data = await res.json();
     showDashboard(data);
   } catch {
-    localStorage.removeItem('token');
-    authToken = null;
+    handleUnauthorized();
   }
 }
+
+// Автоматический кик при истечении сессии (1 час) — проверяем раз в 30 сек
+setInterval(() => {
+  if (!authToken) return;
+  apiFetch(`${API_URL}/api/user/me`, {
+    headers: { 'Authorization': `Bearer ${authToken}` }
+  }).catch(() => {});
+}, 30000);
 
 function showDashboard(data) {
   hide('loginPage');
@@ -742,6 +779,13 @@ function showDashboard(data) {
   else fill.style.background = 'linear-gradient(90deg, #22c55e, #f59e0b)';
   loadValidHistory();
   loadHashcatHistory();
+
+  // Переход с парсера: брутфорс хеша из модалки
+  const hashParam = new URLSearchParams(location.search).get('hashcat');
+  if (hashParam) {
+    openHashcat(hashParam);
+    history.replaceState(null, '', location.pathname);
+  }
 }
 
 function showError(msg) {
