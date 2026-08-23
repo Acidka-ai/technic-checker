@@ -89,7 +89,7 @@ function fmtDate(iso) {
 }
 
 function nickState(row) {
-  if (row.in_db === 1 && row.checked === 1) return 'st-done';
+  if (row.in_db === 1 && row.checked === 1) return 'st-red';
   if (row.in_db === 1) return 'st-green';
   return 'st-white';
 }
@@ -139,50 +139,118 @@ function renderPagination() {
 
 function archiveNicks(rows) {
   try {
-    const key = 'ft_nick_archive';
-    const set = new Set(JSON.parse(localStorage.getItem(key) || '[]'));
+    const ARCHIVE_KEY = 'ft_nick_archive_v2'; // формат: [{nick, donate, server, ts}]
+    const EXPIRY_MS = 48 * 60 * 60 * 1000; // 48 часов
+    const now = Date.now();
+
+    // Загружаем текущий архив
+    let archive = [];
+    try { archive = JSON.parse(localStorage.getItem(ARCHIVE_KEY) || '[]'); } catch { archive = []; }
+
+    // Собираем ники, которые истекают — перед удалением сохраняем их в postExpiry
+    const expiring = archive.filter(e => now - e.ts >= EXPIRY_MS);
+    if (expiring.length) {
+      flushExpiredToTxt(expiring);
+    }
+
+    // Убираем истёкшие
+    archive = archive.filter(e => now - e.ts < EXPIRY_MS);
+
+    // Добавляем новые (обновляем ts если уже есть)
     let added = 0;
     for (const r of rows || []) {
-      const n = String(r.display || r.nickname || '').trim();
-      if (n && !set.has(n)) { set.add(n); added++; }
+      const nick = String(r.display || r.nickname || '').trim();
+      if (!nick) continue;
+      const existing = archive.find(e => e.nick === nick && e.server === (r.server || 'FunTime'));
+      if (existing) {
+        // Обновляем только если поменялся донат
+        if (r.privilege && existing.donate !== r.privilege) existing.donate = r.privilege;
+      } else {
+        archive.push({ nick, donate: r.privilege || '', server: r.server || 'FunTime', ts: now });
+        added++;
+      }
     }
-    if (added) localStorage.setItem(key, JSON.stringify([...set]));
-    if (added) console.log(`[parser] Архив ников: +${added} (всего ${set.size})`);
-  } catch {
+
+    localStorage.setItem(ARCHIVE_KEY, JSON.stringify(archive));
+    if (added) console.log(`[parser] Архив ников: +${added}, активных: ${archive.length}`);
+  } catch (e) {
+    console.warn('[parser] archiveNicks error:', e);
   }
 }
 
-const nickArchiveKey = 'ft_nick_archive';
+// Выгружаем истёкшие ники в localStorage-буфер (в виде txt по серверу)
+function flushExpiredToTxt(expired) {
+  try {
+    const TXT_KEY = 'ft_nick_txt_archive'; // {server: "ник:донат\n..."}
+    let txtData = {};
+    try { txtData = JSON.parse(localStorage.getItem(TXT_KEY) || '{}'); } catch { txtData = {}; }
 
-function getArchivedNicks() {
-  try { return new Set(JSON.parse(localStorage.getItem(nickArchiveKey) || '[]')); }
-  catch { return new Set(); }
+    for (const e of expired) {
+      const server = e.server || 'FunTime';
+      const line = e.donate ? `${e.nick}:${e.donate}` : e.nick;
+      txtData[server] = (txtData[server] ? txtData[server] + '\n' : '') + line;
+    }
+
+    localStorage.setItem(TXT_KEY, JSON.stringify(txtData));
+    console.log(`[parser] Сохранено в txt-архив: ${expired.length} ников`);
+  } catch (e) {
+    console.warn('[parser] flushExpiredToTxt error:', e);
+  }
 }
 
 function downloadNickArchive() {
-  const set = getArchivedNicks();
-  if (!set.size) { toast('Архив ников пуст'); return; }
-  const sorted = [...set].sort((a, b) => a.localeCompare(b, 'ru'));
-  const blob = new Blob([sorted.join('\n')], { type: 'text/plain;charset=utf-8' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = 'ники_архив.txt';
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(link.href);
-  toast(`Скачано ников: ${sorted.length}`);
-}
-
-function archiveNick(name) {
   try {
-    const set = getArchivedNicks();
-    const n = String(name || '').trim();
-    if (n && !set.has(n)) {
-      set.add(n);
-      localStorage.setItem(nickArchiveKey, JSON.stringify([...set]));
+    const ARCHIVE_KEY = 'ft_nick_archive_v2';
+    const TXT_KEY = 'ft_nick_txt_archive';
+    const now = Date.now();
+    const EXPIRY_MS = 48 * 60 * 60 * 1000;
+
+    let active = [];
+    try { active = JSON.parse(localStorage.getItem(ARCHIVE_KEY) || '[]'); } catch { active = []; }
+
+    // Истёкшие тоже сбрасываем в txt прямо сейчас
+    const expiring = active.filter(e => now - e.ts >= EXPIRY_MS);
+    if (expiring.length) flushExpiredToTxt(expiring);
+    active = active.filter(e => now - e.ts < EXPIRY_MS);
+    localStorage.setItem(ARCHIVE_KEY, JSON.stringify(active));
+
+    // Собираем txt-архив
+    let txtData = {};
+    try { txtData = JSON.parse(localStorage.getItem(TXT_KEY) || '{}'); } catch { txtData = {}; }
+
+    // Группируем активные по серверам тоже
+    for (const e of active) {
+      const server = e.server || 'FunTime';
+      const line = e.donate ? `${e.nick}:${e.donate}` : e.nick;
+      if (!txtData[server]) txtData[server] = '';
+      // Проверяем что не дубликат
+      if (!txtData[server].split('\n').includes(line)) {
+        txtData[server] = (txtData[server] ? txtData[server] + '\n' : '') + line;
+      }
     }
-  } catch {
+
+    const servers = Object.keys(txtData);
+    if (!servers.length) { toast('Архив ников пуст'); return; }
+
+    // Скачиваем один файл на каждый сервер
+    let downloaded = 0;
+    for (const server of servers) {
+      const content = txtData[server].trim();
+      if (!content) continue;
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${server}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(link.href);
+      downloaded++;
+    }
+    toast(`Скачано файлов: ${downloaded} (серверов: ${servers.join(', ')})`);
+  } catch (e) {
+    toast('Ошибка при скачивании архива');
+    console.error(e);
   }
 }
 
@@ -310,7 +378,6 @@ function openCheckModal(nick, display) {
   const nickEl = $('#modalNick');
   nickEl.textContent = display || nick;
   nickEl.dataset.nick = nick;
-  archiveNick(display || nick);
   $('#modalStatus').textContent = 'Чекер…';
   $('#modalSpinner').classList.remove('hidden');
   $('#modalResult').classList.add('hidden');

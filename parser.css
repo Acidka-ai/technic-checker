@@ -341,7 +341,7 @@ body::before {
 
 .st-white { color: #ffffff; }
 .st-green { color: var(--ft-green); text-shadow: 0 0 10px rgba(0, 255, 136, 0.35); }
-.st-done { color: #9ca3af; }
+.st-red { color: #ff4466; text-shadow: 0 0 10px rgba(255, 68, 102, 0.35); }
 .td-nick.checking { opacity: 0.6; animation: ftPulse 1s ease-in-out infinite; }
 
 @keyframes ftPulse {
@@ -377,14 +377,41 @@ body::before {
 /* ============ Footer ============ */
 .ft-footer {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
   padding-top: 16px;
   flex-wrap: wrap;
   font-size: 12px;
   color: var(--ft-dim);
+  flex-direction: column;
 }
+
+.ft-legend-block {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+}
+
+.ft-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--ft-dim);
+}
+
+.ft-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dot-green { background: #00ff88; box-shadow: 0 0 6px rgba(0, 255, 136, 0.5); }
+.dot-white { background: #ffffff; box-shadow: 0 0 4px rgba(255,255,255,0.2); }
+.dot-red   { background: #ff4466; box-shadow: 0 0 6px rgba(255, 68, 102, 0.5); }
 
 .ft-legend {
   display: flex;
