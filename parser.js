@@ -143,10 +143,45 @@ function archiveNicks(rows) {
     const set = new Set(JSON.parse(localStorage.getItem(key) || '[]'));
     let added = 0;
     for (const r of rows || []) {
-      const n = (r.nickname || '').trim();
+      const n = String(r.display || r.nickname || '').trim();
       if (n && !set.has(n)) { set.add(n); added++; }
     }
     if (added) localStorage.setItem(key, JSON.stringify([...set]));
+    if (added) console.log(`[parser] Архив ников: +${added} (всего ${set.size})`);
+  } catch {
+  }
+}
+
+const nickArchiveKey = 'ft_nick_archive';
+
+function getArchivedNicks() {
+  try { return new Set(JSON.parse(localStorage.getItem(nickArchiveKey) || '[]')); }
+  catch { return new Set(); }
+}
+
+function downloadNickArchive() {
+  const set = getArchivedNicks();
+  if (!set.size) { toast('Архив ников пуст'); return; }
+  const sorted = [...set].sort((a, b) => a.localeCompare(b, 'ru'));
+  const blob = new Blob([sorted.join('\n')], { type: 'text/plain;charset=utf-8' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'ники_архив.txt';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(link.href);
+  toast(`Скачано ников: ${sorted.length}`);
+}
+
+function archiveNick(name) {
+  try {
+    const set = getArchivedNicks();
+    const n = String(name || '').trim();
+    if (n && !set.has(n)) {
+      set.add(n);
+      localStorage.setItem(nickArchiveKey, JSON.stringify([...set]));
+    }
   } catch {
   }
 }
@@ -242,6 +277,8 @@ $('#perPage').addEventListener('change', (e) => {
   loadRows();
 });
 
+$('#archiveBtn').addEventListener('click', downloadNickArchive);
+
 // Быстрое обновление: запускаем фоновую переиндексацию на сервере и сразу обновляем таблицу
 $('#refreshBtn').addEventListener('click', async () => {
   const btn = $('#refreshBtn');
@@ -273,6 +310,7 @@ function openCheckModal(nick, display) {
   const nickEl = $('#modalNick');
   nickEl.textContent = display || nick;
   nickEl.dataset.nick = nick;
+  archiveNick(display || nick);
   $('#modalStatus').textContent = 'Чекер…';
   $('#modalSpinner').classList.remove('hidden');
   $('#modalResult').classList.add('hidden');
@@ -307,11 +345,6 @@ async function runCheck(nick) {
   return data;
 }
 
-function truncHash(s) {
-  if (!s || s.length <= 26) return s;
-  return s.slice(0, 12) + '…' + s.slice(-12);
-}
-
 function renderCheckResult(result) {
   const badge = $('#modalResultBadge');
   const listEl = $('#modalResultList');
@@ -335,7 +368,7 @@ function renderCheckResult(result) {
     const hash = r.password || '';
     let line = `<div class="ft-dbrow">
       <div class="ft-dbrow-head">🗃 <b>${esc(r.database)}</b> <span class="ft-dbrow-src">${esc(r.source)}</span></div>
-      <div class="ft-hashbox" data-hash="${esc(hash)}" title="Нажмите, чтобы открыть полный хеш"><span class="ft-hash-key">🔐</span>${esc(truncHash(hash))}<span class="ft-hash-more" title="Полный хеш в отдельном окне">👁</span></div>`;
+      <div class="ft-hashbox" data-hash="${esc(hash)}" title="Нажмите, чтобы открыть хеш целиком"><span class="ft-hash-key">🔐</span><span class="ft-hash-val">${esc(hash)}</span><span class="ft-hash-more" title="Полный хеш в отдельном окне">👁</span></div>`;
     if (decrypted) line += `<div class="ft-dbrow-pw">🔑 Пароль: <span class="ft-hash-key" data-copy="${esc(decrypted)}" title="Нажмите, чтобы скопировать">${esc(decrypted)}</span></div>`;
     line += `</div>`;
     lines.push(line);
@@ -345,7 +378,7 @@ function renderCheckResult(result) {
     let line = `<div class="ft-dbrow">
       <div class="ft-dbrow-head">🗃 <b>${esc(r.db || r.database || 'o2')}</b> <span class="ft-dbrow-src">o2</span></div>`;
     if (extra) {
-      line += `<div class="ft-hashbox" data-hash="${esc(extra)}" title="Нажмите, чтобы открыть полное значение"><span class="ft-hash-key">🔐</span>${esc(truncHash(extra))}<span class="ft-hash-more" title="Полное значение в отдельном окне">👁</span></div>`;
+      line += `<div class="ft-hashbox" data-hash="${esc(extra)}" title="Нажмите, чтобы открыть полное значение"><span class="ft-hash-key">🔐</span><span class="ft-hash-val">${esc(extra)}</span><span class="ft-hash-more" title="Полное значение в отдельном окне">👁</span></div>`;
     }
     line += `</div>`;
     lines.push(line);
