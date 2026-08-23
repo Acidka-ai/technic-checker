@@ -345,9 +345,6 @@ $('#perPage').addEventListener('change', (e) => {
   loadRows();
 });
 
-$('#archiveBtn').addEventListener('click', downloadNickArchive);
-
-// Быстрое обновление: запускаем фоновую переиндексацию на сервере и сразу обновляем таблицу
 $('#refreshBtn').addEventListener('click', async () => {
   const btn = $('#refreshBtn');
   btn.disabled = true;
@@ -392,6 +389,8 @@ function openCheckModal(nick, display) {
       $('#modalStatus').textContent = 'Готово';
       $('#modalSpinner').classList.add('hidden');
       renderCheckResult(result);
+      // После чека — обновить цвет ника в таблице на красный (был в базах и теперь проверен)
+      markNickCheckedInTable(nick);
     })
     .catch(e => {
       if (checkId !== modalCheckId) return;
@@ -400,6 +399,19 @@ function openCheckModal(nick, display) {
       $('#modalError').classList.remove('hidden');
       $('#modalError').textContent = e.message || 'Ошибка проверки';
     });
+}
+
+// Обновляет класс цвета ника в таблице после чека
+function markNickCheckedInTable(nick) {
+  const els = document.querySelectorAll(`.td-nick[data-nick="${CSS.escape(nick)}"]`);
+  els.forEach(el => {
+    // Если ник был зелёным (есть в базах, не проверяли) — становится красным
+    if (el.classList.contains('st-green')) {
+      el.classList.remove('st-green');
+      el.classList.add('st-red');
+    }
+    // Если был белым (нет в базах) — оставляем белым, всё ок
+  });
 }
 
 async function runCheck(nick) {

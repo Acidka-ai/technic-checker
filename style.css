@@ -369,20 +369,21 @@ button {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  text-decoration: none;
+  text-decoration: none !important;
   cursor: pointer;
   font-family: 'Inter', sans-serif;
-  background: rgba(0, 255, 136, 0.08);
-  border: 1px solid rgba(0, 255, 136, 0.3);
-  color: var(--accent);
+  background: rgba(0, 255, 136, 0.08) !important;
+  border: 1px solid rgba(0, 255, 136, 0.3) !important;
+  color: var(--accent) !important;
   transition: all 0.2s ease;
+  line-height: 1;
 }
 
 .btn-parser:hover {
-  background: rgba(0, 255, 136, 0.15);
-  border-color: var(--accent);
+  background: rgba(0, 255, 136, 0.15) !important;
+  border-color: var(--accent) !important;
   box-shadow: 0 0 14px rgba(0, 255, 136, 0.2);
-  color: var(--accent);
+  color: var(--accent) !important;
 }
 
 /* Mode Tabs */
