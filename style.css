@@ -620,6 +620,43 @@ button {
   font-family: 'Inter', sans-serif;
 }
 
+.valid-server-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px 0;
+}
+
+.valid-server-toggle .vst-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  font-family: 'Inter', sans-serif;
+}
+
+.valid-server-toggle .vst-btn {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-glass);
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.25s;
+}
+
+.valid-server-toggle .vst-btn:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.valid-server-toggle .vst-btn.active {
+  background: rgba(0, 255, 136, 0.12);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 #checkBtn, #validBtn {
   padding: 0;
   width: 48px;
