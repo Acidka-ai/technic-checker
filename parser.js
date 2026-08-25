@@ -311,8 +311,14 @@ async function loadFilters() {
       data.privileges.map(p => `<div class="ft-option" data-value="${esc(p)}">${esc(p)}</div>`).join('');
     const serverMenu = $('#serverMenu');
     serverMenu.innerHTML = '<div class="ft-option" data-value="">Все серверы</div>' +
-      data.servers.map(s => `<div class="ft-option" data-value="${esc(s)}">FT ${esc(s)}</div>`).join('');
+      data.servers.map(s => `<div class="ft-option" data-value="${esc(s)}">${serverShort(s)} ${esc(s)}</div>`).join('');
   } catch { /* ignore */ }
+}
+
+function serverShort(s) {
+  if (s === 'HolyWorld') return 'HW';
+  if (s === 'FunTime') return 'FT';
+  return s;
 }
 
 function setType(type) { state.type = type; state.page = 1; loadRows(); }
@@ -320,7 +326,7 @@ function setServer(server) {
   state.server = server; state.page = 1;
   $('#serverChip').classList.toggle('hidden', !server);
   if (server) {
-    $('#serverEmpty').textContent = `FT ${server}`;
+    $('#serverEmpty').textContent = `${serverShort(server)} ${server}`;
     $('#serverChip').classList.remove('hidden');
   } else {
     $('#serverEmpty').textContent = '';
@@ -379,8 +385,6 @@ function openCheckModal(nick, display) {
   $('#modalSpinner').classList.remove('hidden');
   $('#modalResult').classList.add('hidden');
   $('#modalError').classList.add('hidden');
-  $('#modalDonateResult').classList.add('hidden');
-  $('#modalDonateBtn').disabled = false;
   $('#modal').classList.remove('hidden');
 
   runCheck(nick)
@@ -496,35 +500,6 @@ function closeHashModal() {
   $('#hashModal').classList.add('hidden');
 }
 
-async function checkDonate(nick) {
-  const btn = $('#modalDonateBtn');
-  const resEl = $('#modalDonateResult');
-  btn.disabled = true;
-  btn.textContent = 'Валидка funtime.su…';
-  resEl.classList.add('hidden');
-  try {
-    const res = await api('/api/parser/check-donate', {
-      method: 'POST',
-      body: JSON.stringify({ nickname: nick })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Ошибка проверки');
-    const donate = data.result && data.result.donate;
-    const label = !donate || donate === 'No Donation' || donate === 'EXISTS' || donate === 'ERROR'
-      ? 'Нет доната'
-      : (donate === 'Unregistered' || donate === 'Аккаунт не существует' ? 'Аккаунт не существует' : donate);
-    resEl.textContent = `✅ Результат: ${label}`;
-    resEl.classList.remove('hidden');
-    loadRows();
-  } catch (e) {
-    resEl.textContent = `❌ ${e.message || 'Ошибка проверки'}`;
-    resEl.classList.remove('hidden');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Узнать дон на funtime.su';
-  }
-}
-
 function closeModal() {
   modalCheckId++;
   $('#modal').classList.add('hidden');
@@ -534,10 +509,6 @@ $('#modalClose').addEventListener('click', closeModal);
 $('#modalNick').addEventListener('click', (e) => {
   const nick = e.target.textContent;
   if (nick && nick !== '—') copyText(nick);
-});
-$('#modalDonateBtn').addEventListener('click', () => {
-  const nick = $('#modalNick').textContent;
-  if (nick && nick !== '—') checkDonate(nick);
 });
 $('#modal').addEventListener('click', (e) => {
   if (e.target === $('#modal')) closeModal();

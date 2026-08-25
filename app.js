@@ -434,6 +434,16 @@ $('#validBtn').addEventListener('click', validCheck);
 $('#validUserInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') validCheck(); });
 $('#validPassInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') validCheck(); });
 
+// выбор сервера для валидки (FunTime / HolyWorld)
+let validServer = 'ft';
+document.querySelectorAll('.vst-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.vst-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    validServer = btn.dataset.server;
+  });
+});
+
 async function validCheck() {
   const username = $('#validUserInput').value.trim();
   const password = $('#validPassInput').value.trim();
@@ -447,20 +457,25 @@ async function validCheck() {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${authToken}`
       },
-      body: JSON.stringify({ username, password })
+      body: JSON.stringify({ username, password, server: validServer })
     });
     const data = await res.json();
     validSound.pause();
     if (res.status === 403) { renderValidResult([{ label: 'Ошибка', value: 'ДНЕВНОЙ ЛИМИТ ИСЧЕРПАН' }], true); return; }
     if (!res.ok) { renderValidResult([{ label: 'Ошибка', value: data.error || 'ПРОВЕРКА НЕ УДАЛАСЬ' }], true); return; }
     const items = [
+      { label: 'Сервер', value: validServer === 'hw' ? 'HolyWorld' : 'FunTime' },
       { label: 'Статус', value: data.valid ? 'Аккаунт действителен' : 'Аккаунт недействителен' },
-      { label: '1FA', value: data.has1fa ? 'Да' : 'Нет' },
-      { label: '2FA', value: data.has2fa ? 'Да' : 'Нет' },
-      { label: 'Забанен', value: data.banned ? 'Да' : 'Нет' },
     ];
-    if (data.banned && data.banReason) items.push({ label: 'Причина бана', value: data.banReason });
-    if (data.banned && data.banDuration) items.push({ label: 'Срок бана', value: data.banDuration });
+    if (validServer === 'hw') {
+      items.push({ label: 'Привязка', value: data.binding === null ? 'Неизвестно' : (data.binding ? 'Да' : 'Нет') });
+    } else {
+      items.push({ label: '1FA', value: data.has1fa ? 'Да' : 'Нет' });
+      items.push({ label: '2FA', value: data.has2fa ? 'Да' : 'Нет' });
+      items.push({ label: 'Забанен', value: data.banned ? 'Да' : 'Нет' });
+      if (data.banned && data.banReason) items.push({ label: 'Причина бана', value: data.banReason });
+      if (data.banned && data.banDuration) items.push({ label: 'Срок бана', value: data.banDuration });
+    }
     renderValidResult(items, false, data.valid);
     showValidStats(data.valid);
     if (!data.valid) nevalidSound.play().catch(() => {});
