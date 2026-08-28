@@ -105,7 +105,7 @@ function renderRows(rows) {
   tbody.innerHTML = rows.map(r => {
     const priv = r.checked && r.check_result ? r.check_result : (r.privilege || '');
     return `<tr>
-      <td><div class="td-server"><img src="funtime.png" class="td-server-icon" alt="" onerror="this.style.display='none'"><span class="td-server-name">${esc(r.server || 'FunTime')}</span></div></td>
+      <td><div class="td-server"><img src="${r.server === 'HolyWorld' ? 'holyworld.png' : 'funtime.png'}" class="td-server-icon" alt="" onerror="this.style.display='none'"><span class="td-server-name">${esc(r.server || 'FunTime')}</span></div></td>
       <td><span class="td-nick ${nickState(r)}" data-nick="${esc(r.nickname)}" data-display="${esc(r.display)}" title="Нажмите для проверки ника">${esc(r.display)}</span></td>
       <td>${priv ? `<span class="td-priv">${esc(priv)}</span>` : '<span class="td-priv"><span class="priv-none">—</span></span>'}</td>
       <td><span class="td-date">${esc(fmtDate(r.parse_date))}</span></td>
@@ -331,6 +331,14 @@ function setServer(server) {
   } else {
     $('#serverEmpty').textContent = '';
     $('#serverChip').classList.add('hidden');
+  }
+  const hdrIcon = $('#ftHeaderIcon'); const hdrSub = $('#ftHeaderSub');
+  if (server) {
+    hdrIcon.src = server === 'HolyWorld' ? 'holyworld.png' : 'funtime.png';
+    hdrSub.textContent = `База ников и донатов ${server}`;
+  } else {
+    hdrIcon.src = 'funtime.png';
+    hdrSub.textContent = 'База ников и донатов Minecraft';
   }
   loadRows();
 }
